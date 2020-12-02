@@ -7,6 +7,7 @@ import (
 	"github.com/magiconair/properties"
 	"github.com/perolo/go-miro/miro"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 	"github.com/perolo/jira-client"
@@ -66,7 +67,7 @@ func main() {
 	for _, board := range boards.Data {
 		boardid = board.ID
 		fmt.Printf("Board Name: %s\n", board.Name)
-		//https://api.miro.com/v1/boards/id/widgets/
+
 		widgets, err := theClient.Widget.ListAllWidgets(context.Background(), board.ID)
 		if err != nil {
 			panic(err)
@@ -100,7 +101,13 @@ func main() {
 		panic(err)
 	}
 	for _, issue := range sres.Issues {
-		title := "[" + issue.Key + "] " + issue.Fields.Summary
+		u, err := url.Parse(issue.Self)
+		if err != nil {
+			panic(err)
+		}
+		//browse/STP-346
+		title := "<p><a href=\"https://" + u.Host + "/browse/"+ issue.Key+ "\">[" + issue.Key + "] " + issue.Fields.Summary + "</a></p>"
+		//<p><a href="https://www.dn.se/">Card Title</a></p>
 		if _, ok := cardslookup[title]; ok {
 			fmt.Printf("Already on board: %s\n", title)
 		} else {
