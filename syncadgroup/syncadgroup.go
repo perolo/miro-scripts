@@ -40,9 +40,9 @@ func initReport(cfg Config) {
 		excelutils.WiteCellln("")
 		excelutils.WiteCellln("The Report Function shows:")
 		excelutils.WiteCellln("   AdNames - Name and user found in AD Group")
-		excelutils.WiteCellln("   JIRA Users - Name and user found in JIRA Group")
+		excelutils.WiteCellln("   Tool Users - Name and user found in Tool Group")
 		excelutils.WiteCellln("   Not in AD - Users in the Local Group not found in the AD")
-		excelutils.WiteCellln("   Not in JIRA - Users in the AD not found in the JIRA Group")
+		excelutils.WiteCellln("   Not in Tool - Users in the AD not found in the Tool Group")
 		excelutils.WiteCellln("   AD Errors - Internal error when searching for user in AD")
 		excelutils.WiteCellln("")
 
@@ -135,7 +135,7 @@ func SyncGroupInTool(cfg Config, client *miro.Client) {
 		if cfg.Report {
 			if !cfg.Limited {
 				for _, tgm := range toolGroupMemberNames {
-					var row = []string{"Miro Users", cfg.AdGroup, cfg.Localgroup, tgm.Name, tgm.Uname, tgm.Mail, tgm.Err}
+					var row = []string{"Tool Users", cfg.AdGroup, cfg.Localgroup, tgm.Name, tgm.Uname, tgm.Mail, tgm.Err}
 					excelutils.WriteColumnsln(row)
 				}
 			}

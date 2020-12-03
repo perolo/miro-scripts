@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"github.com/magiconair/properties"
 	"github.com/perolo/go-miro/miro"
+	"github.com/perolo/jira-client"
 	"log"
 	"net/url"
 	"strings"
 	"time"
-	"github.com/perolo/jira-client"
 )
 
 // or through Decode
@@ -57,9 +57,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	userslookup := make(map[string]string)
+	usernamelookup := make(map[string]string)
+	useridlookup := make(map[string]string)
 	for _, member := range members.Data {
-		userslookup[member.User.ID] = member.User.Name
+		usernamelookup[member.User.ID] = member.User.Name
+		useridlookup[member.User.Name] = member.User.ID
 	}
 	cardslookup := make(map[string]miro.WidgetResponseDataType)
 
@@ -79,8 +81,8 @@ func main() {
 			fmt.Printf("  Widget Type: %s\n", widget.Type)
 			fmt.Printf("  Widget Title: %s\n", widget.Title)
 			fmt.Printf("  Widget Description: %s\n", widget.Description)
-			if _, ok := userslookup[widget.Assignee.UserID]; ok {
-				fmt.Printf("  Widget Assignee: %s\n", userslookup[widget.Assignee.UserID])
+			if _, ok := usernamelookup[widget.Assignee.UserID]; ok {
+				fmt.Printf("  Widget Assignee: %s\n", usernamelookup[widget.Assignee.UserID])
 			} else {
 				fmt.Printf("  Unknown Assignee: %s\n", widget.Assignee.UserID)
 			}
@@ -101,27 +103,75 @@ func main() {
 		panic(err)
 	}
 	for _, issue := range sres.Issues {
-		u, err := url.Parse(issue.Self)
-		if err != nil {
-			panic(err)
-		}
-		//browse/STP-346
-		title := "<p><a href=\"https://" + u.Host + "/browse/"+ issue.Key+ "\">[" + issue.Key + "] " + issue.Fields.Summary + "</a></p>"
-		//<p><a href="https://www.dn.se/">Card Title</a></p>
+		title := getTitle(issue)
 		if _, ok := cardslookup[title]; ok {
 			fmt.Printf("Already on board: %s\n", title)
 		} else {
-			newCard2 := miro.Card{
+			newCard2 := miro.SimpleCard{
 				Type:        "card",
 				Title:       title,
 				Description: issue.Fields.Description,
 			}
-			resp, err := theClient.Widget.CreateCard(context.Background(), boardid, &newCard2)
+			resp, err := theClient.Widget.CreateSimpleCard(context.Background(), boardid, &newCard2)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("  resp: %s\n", resp)
+			fmt.Printf("  resp: %s\n", resp.Title)
+			cardslookup[title] = miro.WidgetResponseDataType{
+				ID:          resp.ID,
+				Title:       resp.Title,
+				Description: resp.Description,
+				Assignee: struct {
+					UserID string `json:"userId"`
+				}{resp.Assignee.UserID},
+			}
+		}
+
+	}
+	for _, issue := range sres.Issues {
+		title := getTitle(issue)
+		if _, ok := cardslookup[title]; ok {
+			wid := cardslookup[title]
+			var issueAssignee string
+			issueAssignee = ""
+			if issue.Fields.Assignee != nil {
+				issueAssignee = issue.Fields.Assignee.DisplayName
+			}
+			if issueAssignee == usernamelookup[wid.Assignee.UserID] {
+				fmt.Printf("Already right assignee: %s\n", title)
+			} else {
+				var changeAssignee miro.SimpleCardAssignee
+				var resp *miro.CreateCardRespType
+				if _, ok := useridlookup[issue.Fields.Assignee.DisplayName]; ok {
+					changeAssignee.Assignee.UserID = useridlookup[issueAssignee]
+				} else {
+
+					changeAssignee.Assignee.UserID = ""
+				}
+				if wid.Assignee.UserID == "" && changeAssignee.Assignee.UserID== "" {
+					fmt.Printf("Do nothing - Assignee unknown in Miro: %s\n", issue.Fields.Assignee.DisplayName)
+
+				} else {
+					resp, err = theClient.Widget.UpdateAssigneeCard(context.Background(), boardid, wid.ID, &changeAssignee)
+					if err != nil {
+						panic(err)
+					}
+					fmt.Printf("  resp: %s\n", resp.Title)
+				}
+			}
+		} else {
+			panic(err)
 		}
 	}
+}
 
+func getTitle(issue jira.Issue) string {
+	u, err := url.Parse(issue.Self)
+	if err != nil {
+		panic(err)
+	}
+	//browse/STP-346
+	title := "<p><a href=\"https://" + u.Host + "/browse/" + issue.Key + "\">[" + issue.Key + "] " + issue.Fields.Summary + "</a></p>"
+	//<p><a href="https://www.dn.se/">SimpleCard Title</a></p>
+	return title
 }
