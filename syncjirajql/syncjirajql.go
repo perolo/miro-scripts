@@ -34,6 +34,8 @@ type Config struct {
 	BoardName       string `properties:"boardname"`
 }
 
+var categoryLookup map[string]string
+
 func main() {
 	propPtr := flag.String("prop", "confluence.properties", "a string")
 	flag.Parse()
@@ -59,6 +61,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	categoryLookup = make(map[string]string)
 	usernamelookup := make(map[string]string)
 	useridlookup := make(map[string]string)
 	for _, member := range members.Data {
@@ -120,6 +123,7 @@ func main() {
 		}
 		for _, issue := range sres.Issues {
 			title := getTitle(issue)
+			categoryLookup[issue.Fields.Status.Name] = issue.Fields.Status.StatusCategory.Name
 			if _, ok := cardslookup[issue.Key]; ok {
 				fmt.Printf("Already on board: %s\n", title)
 			} else {
@@ -140,27 +144,33 @@ func main() {
 					Assignee: struct {
 						UserID string `json:"userId"`
 					}{resp.Assignee.UserID},
+					Style: struct {
+					BackgroundColor string `json:"backgroundColor"`
+					}{resp.Style.BackgroundColor},
+
 				}
 				var newMeta miro.WidgetMetadataType
 				newMeta.Title = title
 				newMeta.AppId = cfg.AppId
 				newMeta.Issue = issue.Key
-
+				newMeta.Status = issue.Fields.Status.Name
+				lookupState(issue.Fields.Status.Name)
 				respM, err := theClient.Widget.UpdateWidgetMetadata(context.Background(), boardid, resp.ID, &newMeta)
 				if err != nil {
 					panic(err)
 				}
 				fmt.Printf("  resp: %s\n", respM.Title)
-
+/*
 				cardslookup[issue.Key] = miro.WidgetResponseDataType{
 					ID:          resp.ID,
 					Title:       title,
 					Description: resp.Description,
+
 					Assignee: struct {
 						UserID string `json:"userId"`
 					}{resp.Assignee.UserID},
 				}
-
+*/
 			}
 
 		}
@@ -194,6 +204,19 @@ func main() {
 						//fmt.Printf("  resp: %s\n", resp.Title)
 					}
 				}
+
+				if wid.Style.BackgroundColor == lookupState(issue.Fields.Status.Name) {
+					fmt.Printf("Already right color: %s\n", title)
+				} else {
+					var changeStyle miro.SimpleCardStyle
+					changeStyle.Style.BackgroundColor = lookupState(issue.Fields.Status.Name)
+					_, err = theClient.Widget.UpdateStyleCard(context.Background(), boardid, wid.ID, &changeStyle)
+					if err != nil {
+						panic(err)
+					}
+
+				}
+
 			} else {
 				panic(err)
 			}
@@ -202,12 +225,26 @@ func main() {
 		fmt.Printf("Board Not Found: %s\n", boardname)
 	}
 }
+func lookupState(status string) string{
+	var color string
+	//TO DO kinda backwards, but I wanted to keep the options to add a Tag=status when this is added...
+	if categoryLookup[status] == "Done" {
+		color = "#008000"
+	} else if categoryLookup[status] == "In Progress" {
+		color = "#FFFF00"
+	} else 	if categoryLookup[status] == "To Do" {
+		color = "#0000ff"
+	} else {
+		panic(fmt.Errorf("illegal Status %s", status))
+	}
+	return color
+}
 
 func getTitle(issue jira.Issue) string {
 	u, err := url.Parse(issue.Self)
 	if err != nil {
 		panic(err)
 	}
-	title := "<p><a href=\"https://" + u.Host + "/browse/" + issue.Key + "\">[" + issue.Key + "] " + issue.Fields.Summary + "</a></p> [" + issue.Fields.Status.Name + "]"
+	title := "<p><a href=\"https://" + u.Host + "/browse/" + issue.Key + "\">[" + issue.Key + "] " + issue.Fields.Summary + "</a></p>"
 	return title
 }
