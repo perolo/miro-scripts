@@ -1,4 +1,4 @@
-package main
+package syncjirajql
 
 import (
 	"context"
@@ -36,10 +36,10 @@ type Config struct {
 
 var categoryLookup map[string]string
 
-func main() {
-	propPtr := flag.String("prop", "confluence.properties", "a string")
+func SyncJiraJQL(propPtr string) {
+//	propPtr := flag.String("prop", "confluence.properties", "a string")
 	flag.Parse()
-	p := properties.MustLoadFile(*propPtr, properties.ISO_8859_1)
+	p := properties.MustLoadFile(propPtr, properties.ISO_8859_1)
 	var cfg Config
 	if err := p.Decode(&cfg); err != nil {
 		log.Fatal(err)

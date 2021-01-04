@@ -1,4 +1,4 @@
-package main
+package syncadgroup
 
 type GroupSyncType struct {
 	AdGroup    string
