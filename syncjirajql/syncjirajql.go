@@ -104,125 +104,122 @@ func SyncJiraJQL(propPtr string) {
 					fmt.Printf("  Unknown Assignee: %s\n", widget.Assignee.UserID)
 				}
 			}
-		}
-	}
-
-	if boardname == cfg.BoardName {
-		tp := jira.BasicAuthTransport{
-			Username: strings.TrimSpace(cfg.User),
-			Password: strings.TrimSpace(cfg.Pass),
-		}
-		jiraClient, err := jira.NewClient(tp.Client(), strings.TrimSpace(cfg.Host))
-		if err != nil {
-			fmt.Printf("\nerror: %v\n", err)
-			panic(err)
-		}
-		sres, _, err := jiraClient.Issue.Search(cfg.JQL, &jira.SearchOptions{StartAt: 0, MaxResults: 10})
-		if err != nil {
-			panic(err)
-		}
-		for _, issue := range sres.Issues {
-			title := getTitle(issue)
-			categoryLookup[issue.Fields.Status.Name] = issue.Fields.Status.StatusCategory.Name
-			if _, ok := cardslookup[issue.Key]; ok {
-				fmt.Printf("Already on board: %s\n", title)
-			} else {
-				newCard2 := miro.SimpleCard{
-					Type:        "card",
-					Title:       title,
-					Description: issue.Fields.Description,
+			if boardname == cfg.BoardName {
+				tp := jira.BasicAuthTransport{
+					Username: strings.TrimSpace(cfg.User),
+					Password: strings.TrimSpace(cfg.Pass),
 				}
-				resp, err := theClient.Widget.CreateSimpleCard(context.Background(), boardid, &newCard2)
+				jiraClient, err := jira.NewClient(tp.Client(), strings.TrimSpace(cfg.Host))
+				if err != nil {
+					fmt.Printf("\nerror: %v\n", err)
+					panic(err)
+				}
+				sres, _, err := jiraClient.Issue.Search(cfg.JQL, &jira.SearchOptions{StartAt: 0, MaxResults: 10})
 				if err != nil {
 					panic(err)
 				}
-				fmt.Printf("  resp: %s\n", resp.Title)
-				cardslookup[issue.Key] = miro.WidgetResponseDataType{
-					ID:          resp.ID,
-					Title:       title,
-					Description: resp.Description,
-					Assignee: struct {
-						UserID string `json:"userId"`
-					}{resp.Assignee.UserID},
-					Style: struct {
-					BackgroundColor string `json:"backgroundColor"`
-					}{resp.Style.BackgroundColor},
-
-				}
-				var newMeta miro.WidgetMetadataType
-				newMeta.Title = title
-				newMeta.AppId = cfg.AppId
-				newMeta.Issue = issue.Key
-				newMeta.Status = issue.Fields.Status.Name
-				lookupState(issue.Fields.Status.Name)
-				respM, err := theClient.Widget.UpdateWidgetMetadata(context.Background(), boardid, resp.ID, &newMeta)
-				if err != nil {
-					panic(err)
-				}
-				fmt.Printf("  resp: %s\n", respM.Title)
-/*
-				cardslookup[issue.Key] = miro.WidgetResponseDataType{
-					ID:          resp.ID,
-					Title:       title,
-					Description: resp.Description,
-
-					Assignee: struct {
-						UserID string `json:"userId"`
-					}{resp.Assignee.UserID},
-				}
-*/
-			}
-
-		}
-		for _, issue := range sres.Issues {
-			title := getTitle(issue)
-			if _, ok := cardslookup[issue.Key]; ok {
-				wid := cardslookup[issue.Key]
-				var issueAssignee string
-				issueAssignee = ""
-				if issue.Fields.Assignee != nil {
-					issueAssignee = issue.Fields.Assignee.DisplayName
-				}
-				if issueAssignee == usernamelookup[wid.Assignee.UserID] {
-					fmt.Printf("Already right assignee: %s\n", title)
-				} else {
-					var changeAssignee miro.SimpleCardAssignee
-					//var resp *miro.CreateCardRespType
-					if _, ok := useridlookup[issue.Fields.Assignee.DisplayName]; ok {
-						changeAssignee.Assignee.UserID = useridlookup[issueAssignee]
+				for _, issue := range sres.Issues {
+					title := getTitle(issue)
+					categoryLookup[issue.Fields.Status.Name] = issue.Fields.Status.StatusCategory.Name
+					if _, ok := cardslookup[issue.Key]; ok {
+						fmt.Printf("Already on board: %s\n", title)
 					} else {
-
-						changeAssignee.Assignee.UserID = ""
-					}
-					if wid.Assignee.UserID == "" && changeAssignee.Assignee.UserID == "" {
-						fmt.Printf("Do nothing - Assignee unknown in Miro: %s\n", issue.Fields.Assignee.DisplayName)
-					} else {
-						_, err = theClient.Widget.UpdateAssigneeCard(context.Background(), boardid, wid.ID, &changeAssignee)
+						newCard2 := miro.SimpleCard{
+							Type:        "card",
+							Title:       title,
+							Description: issue.Fields.Description,
+						}
+						resp, err := theClient.Widget.CreateSimpleCard(context.Background(), boardid, &newCard2)
 						if err != nil {
 							panic(err)
 						}
-						//fmt.Printf("  resp: %s\n", resp.Title)
-					}
-				}
+						fmt.Printf("  resp: %s\n", resp.Title)
+						cardslookup[issue.Key] = miro.WidgetResponseDataType{
+							ID:          resp.ID,
+							Title:       title,
+							Description: resp.Description,
+							Assignee: struct {
+								UserID string `json:"userId"`
+							}{resp.Assignee.UserID},
+							Style: struct {
+								BackgroundColor string `json:"backgroundColor"`
+							}{resp.Style.BackgroundColor},
 
-				if wid.Style.BackgroundColor == lookupState(issue.Fields.Status.Name) {
-					fmt.Printf("Already right color: %s\n", title)
-				} else {
-					var changeStyle miro.SimpleCardStyle
-					changeStyle.Style.BackgroundColor = lookupState(issue.Fields.Status.Name)
-					_, err = theClient.Widget.UpdateStyleCard(context.Background(), boardid, wid.ID, &changeStyle)
-					if err != nil {
+						}
+						var newMeta miro.WidgetMetadataType
+						newMeta.Title = title
+						newMeta.AppId = cfg.AppId
+						newMeta.Issue = issue.Key
+						newMeta.Status = issue.Fields.Status.Name
+						lookupState(issue.Fields.Status.Name)
+						respM, err := theClient.Widget.UpdateWidgetMetadata(context.Background(), boardid, resp.ID, &newMeta)
+						if err != nil {
+							panic(err)
+						}
+						fmt.Printf("  resp: %s\n", respM.Title)
+						/*
+							cardslookup[issue.Key] = miro.WidgetResponseDataType{
+								ID:          resp.ID,
+								Title:       title,
+								Description: resp.Description,
+
+								Assignee: struct {
+									UserID string `json:"userId"`
+								}{resp.Assignee.UserID},
+							}
+						*/
+					}
+
+				}
+				for _, issue := range sres.Issues {
+					title := getTitle(issue)
+					if _, ok := cardslookup[issue.Key]; ok {
+						wid := cardslookup[issue.Key]
+						var issueAssignee string
+						issueAssignee = ""
+						if issue.Fields.Assignee != nil {
+							issueAssignee = issue.Fields.Assignee.DisplayName
+						}
+						if issueAssignee == usernamelookup[wid.Assignee.UserID] {
+							fmt.Printf("Already right assignee: %s\n", title)
+						} else {
+							var changeAssignee miro.SimpleCardAssignee
+							//var resp *miro.CreateCardRespType
+							if _, ok := useridlookup[issue.Fields.Assignee.DisplayName]; ok {
+								changeAssignee.Assignee.UserID = useridlookup[issueAssignee]
+							} else {
+
+								changeAssignee.Assignee.UserID = ""
+							}
+							if wid.Assignee.UserID == "" && changeAssignee.Assignee.UserID == "" {
+								fmt.Printf("Do nothing - Assignee unknown in Miro: %s\n", issue.Fields.Assignee.DisplayName)
+							} else {
+								_, err = theClient.Widget.UpdateAssigneeCard(context.Background(), boardid, wid.ID, &changeAssignee)
+								if err != nil {
+									panic(err)
+								}
+								//fmt.Printf("  resp: %s\n", resp.Title)
+							}
+						}
+
+						if wid.Style.BackgroundColor == lookupState(issue.Fields.Status.Name) {
+							fmt.Printf("Already right color: %s\n", title)
+						} else {
+							var changeStyle miro.SimpleCardStyle
+							changeStyle.Style.BackgroundColor = lookupState(issue.Fields.Status.Name)
+							_, err = theClient.Widget.UpdateStyleCard(context.Background(), boardid, wid.ID, &changeStyle)
+							if err != nil {
+								panic(err)
+							}
+
+						}
+
+					} else {
 						panic(err)
 					}
-
 				}
-
-			} else {
-				panic(err)
 			}
 		}
-	} else {
-		fmt.Printf("Board Not Found: %s\n", boardname)
 	}
 }
 func lookupState(status string) string{

@@ -71,6 +71,7 @@ func endReport(cfg Config) {
 	if cfg.Report {
 		file := fmt.Sprintf(cfg.File, "-Miro")
 		excelutils.AutoFilterEnd()
+		excelutils.SetColWidth("A", "A", 60)
 		excelutils.SaveAs(file)
 	}
 }
